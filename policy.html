@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cattle Insurance Policy</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f4ef;font-family:Arial,Helvetica,sans-serif;color:#454545}
+.card{max-width:760px;margin:18px auto;background:#fff;border:1px solid #ddd;box-shadow:0 1px 5px #bbb}
+.top{height:42px;background:#fdbd08}.section{background:#ffff9a;text-align:center;font-size:28px;font-weight:700;padding:22px 10px;border-top:1px solid #ddd;border-bottom:1px solid #ddd}
+.section.green{background:#79c843}.row{display:grid;grid-template-columns:36% 64%;min-height:70px;border-bottom:1px solid #ddd}
+.label,.value{padding:18px 16px;font-size:22px;font-weight:600;display:flex;align-items:center}.label{background:#faf9e5;border-right:1px solid #ddd}
+.value{background:#fff;word-break:break-word}.status{color:green;font-weight:700}
+.message{max-width:760px;margin:40px auto;padding:30px;text-align:center;background:#fff;border:1px solid #ddd;font-size:20px}
+@media(max-width:600px){.section{font-size:22px}.row{grid-template-columns:38% 62%;min-height:60px}.label,.value{font-size:16px;padding:14px 10px}}
+</style></head><body><div id="app"></div>
+<script>
+(async function(){
+ const id=new URLSearchParams(location.search).get("id"), app=document.getElementById("app");
+ if(!id){app.innerHTML='<div class="message"><h2>Policy not specified</h2><p>Open this page using a policy QR code.</p></div>';return;}
+ try{
+  const p=(await (await fetch("policies.json",{cache:"no-store"})).json())[id];
+  if(!p){app.innerHTML='<div class="message"><h2>Policy not found</h2><p>Please check the QR code or policy number.</p></div>';return;}
+  const row=(a,b,c="")=>'<div class="row"><div class="label">'+a+'</div><div class="value '+c+'">'+(b||"")+'</div></div>';
+  app.innerHTML='<div class="card"><div class="top"></div>'+
+   row("Policy Issuing Office",p.policyIssuingOffice)+'<div class="section">Policy Details</div>'+
+   row("Policy Type",p.policyType)+row("Policy No.",p.policyNo)+row("Policy Start Date",p.policyStartDate)+
+   row("Policy Expiry Date",p.policyExpiryDate)+row("Sum Insured",p.sumInsured)+row("Net Premium",p.netPremium)+
+   row("GST Amount",p.gstAmount)+row("Total Premium",p.totalPremium)+row("Mode Of Payment",p.modeOfPayment)+
+   row("Policy Status",p.policyStatus,"status")+'<div class="section green">Customer Details</div>'+
+   row("Customer Name",p.customerName)+row("Customer Id",p.customerId)+row("Mobile No",p.mobileNo)+
+   row("E mail Id",p.email)+row("GST Reg. No",p.gstRegNo)+'</div>';
+ }catch(e){app.innerHTML='<div class="message"><h2>Unable to load policy</h2><p>Please try again later.</p></div>';}
+})();
+</script></body></html>
