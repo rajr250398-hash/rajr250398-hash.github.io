@@ -24,17 +24,162 @@ body{font-family:Arial;margin:0;background:#f4f7fb;color:#222}.wrap{max-width:11
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-const API="https://cattle-policy-api.rajr250398.workers.dev";let token="",policies=[];
-const esc=x=>String(x??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
-function msg(el,t,ok){el.textContent=t;el.className="msg "+(ok?"ok":"err")}
-async function api(path,opt={}){opt.headers=Object.assign({"Content-Type":"application/json"},opt.headers||{});if(token)opt.headers.Authorization="Bearer "+token;let r=await fetch(API+path,opt),d={};try{d=await r.json()}catch(e){}if(!r.ok)throw Error(d.error||"Request failed");return d}
-lf.onsubmit=async e=>{e.preventDefault();try{token=pw.value;await api("/api/policies");login.classList.add("hidden");app.classList.remove("hidden");await load()}catch(e){token="";msg(lm,"Login failed: "+e.message,false)}};
-async function load(q=""){try{policies=await api("/api/policies"+(q?"?search="+encodeURIComponent(q):""));rows.innerHTML=policies.length?policies.map((p,i)=>"<tr><td>"+esc(p.policy_no)+"</td><td>"+esc(p.customer_name||"-")+"</td><td>"+esc(p.policy_status||"-")+"</td><td>"+esc(p.policy_start_date||"-")+"</td><td>"+esc(p.policy_expiry_date||"-")+"</td><td><button onclick='edit("+i+")'>Edit</button><button class='danger' onclick='del(""+esc(p.policy_no)+"")'>Delete</button><button class='secondary' onclick='qr(""+esc(p.policy_no)+"")'>QR</button></td></tr>").join(""):"<tr><td colspan='6'>No policies found.</td></tr>"}catch(e){rows.innerHTML="<tr><td colspan='6'>"+esc(e.message)+"</td></tr>"}}
-window.edit=i=>{let p=policies[i];[...pf.elements].forEach(x=>{if(x.name)x.value=p[x.name]??""});scrollTo({top:0,behavior:"smooth"})};
-window.del=async id=>{if(!confirm("Delete policy "+id+"?"))return;try{await api("/api/policy?id="+encodeURIComponent(id),{method:"DELETE"});msg(sm,"Policy deleted.",true);load(search.value.trim())}catch(e){msg(sm,e.message,false)}};
-function qr(id){let u=new URL("policy.html",location.href);u.searchParams.set("id",id);qrbox.style.display="block";qr.innerHTML="";new QRCode(qr,{text:u.toString(),width:220,height:220});qurl.textContent=u.toString();open.href=u.toString();qrbox.scrollIntoView({behavior:"smooth"})}
-pf.onsubmit=async e=>{e.preventDefault();let o=Object.fromEntries(new FormData(pf).entries());try{let d=await api("/api/policy",{method:"POST",body:JSON.stringify(o)});msg(sm,d.message+" ("+d.policy_no+")",true);qr(d.policy_no);load(search.value.trim())}catch(e){msg(sm,"Save failed: "+e.message,false)}};
-clear.onclick=()=>{pf.reset();pf.policy_type.value="CattleInsurance";pf.policy_status.value="Active";qrbox.style.display="none";sm.className="msg"};
-go.onclick=()=>load(search.value.trim());all.onclick=()=>{search.value="";load()};logout.onclick=()=>{token="";app.classList.add("hidden");login.classList.remove("hidden");pw.focus()};
-printqr.onclick=()=>{let w=open("","_blank");w.document.write("<html><body style='text-align:center;font-family:Arial'><h2>Cattle Insurance Policy Verification</h2>"+qr.innerHTML+"<p>"+esc(qurl.textContent)+"</p><script>onload=()=>print()<\/script></body></html>");w.document.close()};
+const API="https://cattle-policy-api.rajr250398.workers.dev";
+let token="", policies=[];
+
+const $ = (id) => document.getElementById(id);
+const loginBox = $("login");
+const appBox = $("app");
+const loginForm = $("lf");
+const passwordInput = $("pw");
+const loginMsg = $("lm");
+const policyForm = $("pf");
+const saveMsg = $("sm");
+const qrBox = $("qrbox");
+const qrContainer = $("qr");
+const qrUrl = $("qurl");
+const openLink = $("open");
+const printQrBtn = $("printqr");
+const clearBtn = $("clear");
+const searchInput = $("search");
+const rows = $("rows");
+const searchBtn = $("go");
+const allBtn = $("all");
+const logoutBtn = $("logout");
+
+const esc = x => String(x ?? "").replace(/[&<>"]/g, m => ({
+  "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"
+}[m]));
+
+function msg(el, text, ok) {
+  el.textContent = text;
+  el.className = "msg " + (ok ? "ok" : "err");
+}
+
+async function api(path, opt = {}) {
+  opt.headers = Object.assign({"Content-Type":"application/json"}, opt.headers || {});
+  if (token) opt.headers.Authorization = "Bearer " + token;
+  const response = await fetch(API + path, opt);
+  let data = {};
+  try { data = await response.json(); } catch (e) {}
+  if (!response.ok) throw Error(data.error || "Request failed");
+  return data;
+}
+
+loginForm.onsubmit = async (e) => {
+  e.preventDefault();
+  loginMsg.textContent = "";
+  try {
+    token = passwordInput.value;
+    await api("/api/policies");
+    loginBox.classList.add("hidden");
+    appBox.classList.remove("hidden");
+    await load();
+  } catch (e) {
+    token = "";
+    msg(loginMsg, "Login failed: " + e.message, false);
+  }
+};
+
+async function load(q = "") {
+  try {
+    policies = await api("/api/policies" + (q ? "?search=" + encodeURIComponent(q) : ""));
+    rows.innerHTML = policies.length ? policies.map((p, i) => `
+      <tr>
+        <td>${esc(p.policy_no)}</td>
+        <td>${esc(p.customer_name || "-")}</td>
+        <td>${esc(p.policy_status || "-")}</td>
+        <td>${esc(p.policy_start_date || "-")}</td>
+        <td>${esc(p.policy_expiry_date || "-")}</td>
+        <td>
+          <button onclick="editPolicy(${i})">Edit</button>
+          <button class="danger" onclick="deletePolicy('${esc(p.policy_no).replace(/'/g, "&#39;")}')">Delete</button>
+          <button class="secondary" onclick="showQr('${esc(p.policy_no).replace(/'/g, "&#39;")}')">QR</button>
+        </td>
+      </tr>`).join("") : "<tr><td colspan='6'>No policies found.</td></tr>";
+  } catch (e) {
+    rows.innerHTML = "<tr><td colspan='6'>" + esc(e.message) + "</td></tr>";
+  }
+}
+
+window.editPolicy = (i) => {
+  const p = policies[i];
+  [...policyForm.elements].forEach(x => {
+    if (x.name) x.value = p[x.name] ?? "";
+  });
+  window.scrollTo({top:0, behavior:"smooth"});
+};
+
+window.deletePolicy = async (id) => {
+  if (!confirm("Delete policy " + id + "?")) return;
+  try {
+    await api("/api/policy?id=" + encodeURIComponent(id), {method:"DELETE"});
+    msg(saveMsg, "Policy deleted.", true);
+    load(searchInput.value.trim());
+  } catch (e) {
+    msg(saveMsg, e.message, false);
+  }
+};
+
+function showQr(id) {
+  const u = new URL("policy.html", window.location.href);
+  u.searchParams.set("id", id);
+  qrBox.style.display = "block";
+  qrContainer.innerHTML = "";
+  new QRCode(qrContainer, {text:u.toString(), width:220, height:220});
+  qrUrl.textContent = u.toString();
+  openLink.href = u.toString();
+  qrBox.scrollIntoView({behavior:"smooth"});
+}
+
+policyForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(policyForm).entries());
+  try {
+    const result = await api("/api/policy", {
+      method:"POST",
+      body:JSON.stringify(data)
+    });
+    msg(saveMsg, result.message + " (" + result.policy_no + ")", true);
+    showQr(result.policy_no);
+    load(searchInput.value.trim());
+  } catch (e) {
+    msg(saveMsg, "Save failed: " + e.message, false);
+  }
+};
+
+clearBtn.onclick = () => {
+  policyForm.reset();
+  policyForm.policy_type.value = "CattleInsurance";
+  policyForm.policy_status.value = "Active";
+  qrBox.style.display = "none";
+  saveMsg.className = "msg";
+  saveMsg.textContent = "";
+};
+
+searchBtn.onclick = () => load(searchInput.value.trim());
+allBtn.onclick = () => { searchInput.value = ""; load(); };
+
+logoutBtn.onclick = () => {
+  token = "";
+  appBox.classList.add("hidden");
+  loginBox.classList.remove("hidden");
+  passwordInput.value = "";
+  passwordInput.focus();
+};
+
+printQrBtn.onclick = () => {
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Please allow pop-ups for this site to print the QR code.");
+    return;
+  }
+  w.document.write(`<!doctype html><html><body style="text-align:center;font-family:Arial">
+    <h2>Cattle Insurance Policy Verification</h2>
+    ${qrContainer.innerHTML}
+    <p>${esc(qrUrl.textContent)}</p>
+    <script>window.onload=()=>window.print()<\/script>
+  </body></html>`);
+  w.document.close();
+};
 </script></body></html>
