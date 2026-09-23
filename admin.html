@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Policy Admin</title>
+<style>
+body{font-family:Arial;margin:0;background:#f4f7fb;color:#222}.wrap{max-width:1150px;margin:25px auto;padding:15px}.card{background:white;padding:24px;border-radius:16px;box-shadow:0 8px 30px #0001;margin-bottom:18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-weight:bold;margin-bottom:5px}input{width:100%;padding:11px;box-sizing:border-box;border:1px solid #ccd;border-radius:8px}button{padding:10px 14px;border:0;border-radius:8px;background:#166534;color:white;font-weight:bold;cursor:pointer;margin:5px 5px 0 0}.secondary{background:white;color:#344054;border:1px solid #ccd}.danger{background:#b42318}.msg{margin-top:12px;padding:10px;border-radius:8px}.ok{background:#ecfdf3;color:#027a48}.err{background:#fef3f2;color:#b42318}.hidden{display:none}.toolbar{display:flex;gap:8px;margin-bottom:12px}.toolbar input{flex:1}table{width:100%;border-collapse:collapse;min-width:700px}th,td{text-align:left;padding:9px;border-bottom:1px solid #eee}.tablewrap{overflow:auto}#qrbox{display:none;margin-top:18px;padding:18px;border:1px dashed #999;border-radius:10px}.url{word-break:break-all;font-size:12px;color:#667085}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<div id="login" class="card" style="max-width:430px;margin:60px auto"><h1>Admin Login</h1><p>Enter your Cloudflare ADMIN_PASSWORD.</p><form id="lf"><input id="pw" type="password" required><button>Login</button></form><div id="lm"></div></div>
+<div id="app" class="hidden">
+<div class="card"><h1>Policy Administration</h1><p>Add, update, search, delete policies and generate QR codes.</p>
+<form id="pf"><div class="grid">
+<label>Policy Issuing Office<input name="policy_issuing_office"></label><label>Policy Type<input name="policy_type" value="CattleInsurance"></label>
+<label>Policy No. *<input name="policy_no" required></label><label>Policy Status<input name="policy_status" value="Active"></label>
+<label>Policy Start Date<input name="policy_start_date" placeholder="DD/MM/YYYY"></label><label>Policy Expiry Date<input name="policy_expiry_date" placeholder="DD/MM/YYYY"></label>
+<label>Sum Insured<input name="sum_insured"></label><label>Net Premium<input name="net_premium"></label>
+<label>GST Amount<input name="gst_amount"></label><label>Total Premium<input name="total_premium"></label>
+<label>Mode Of Payment<input name="mode_of_payment"></label><label>Customer Name<input name="customer_name"></label>
+<label>Customer Id<input name="customer_id"></label><label>Mobile No<input name="mobile_no"></label>
+<label>E mail Id<input name="email" type="email"></label><label>GST Reg. No.<input name="gst_reg_no"></label>
+</div><button>Save / Update Policy</button><button type="button" class="secondary" id="clear">Clear</button></form><div id="sm"></div>
+<div id="qrbox"><h2>Verification QR Code</h2><div id="qr"></div><div id="qurl" class="url"></div><a id="open" target="_blank">Open Verification Page</a> <button type="button" class="secondary" id="printqr">Print QR</button></div>
+</div>
+<div class="card"><h2>Saved Policies</h2><div class="toolbar"><input id="search" placeholder="Policy number or customer name"><button type="button" id="go">Search</button><button type="button" class="secondary" id="all">Show All</button><button type="button" class="secondary" id="logout">Logout</button></div>
+<div class="tablewrap"><table><thead><tr><th>Policy No.</th><th>Customer</th><th>Status</th><th>Start</th><th>Expiry</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const API="https://cattle-policy-api.rajr250398.workers.dev";let token="",policies=[];
+const esc=x=>String(x??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+function msg(el,t,ok){el.textContent=t;el.className="msg "+(ok?"ok":"err")}
+async function api(path,opt={}){opt.headers=Object.assign({"Content-Type":"application/json"},opt.headers||{});if(token)opt.headers.Authorization="Bearer "+token;let r=await fetch(API+path,opt),d={};try{d=await r.json()}catch(e){}if(!r.ok)throw Error(d.error||"Request failed");return d}
+lf.onsubmit=async e=>{e.preventDefault();try{token=pw.value;await api("/api/policies");login.classList.add("hidden");app.classList.remove("hidden");await load()}catch(e){token="";msg(lm,"Login failed: "+e.message,false)}};
+async function load(q=""){try{policies=await api("/api/policies"+(q?"?search="+encodeURIComponent(q):""));rows.innerHTML=policies.length?policies.map((p,i)=>"<tr><td>"+esc(p.policy_no)+"</td><td>"+esc(p.customer_name||"-")+"</td><td>"+esc(p.policy_status||"-")+"</td><td>"+esc(p.policy_start_date||"-")+"</td><td>"+esc(p.policy_expiry_date||"-")+"</td><td><button onclick='edit("+i+")'>Edit</button><button class='danger' onclick='del(""+esc(p.policy_no)+"")'>Delete</button><button class='secondary' onclick='qr(""+esc(p.policy_no)+"")'>QR</button></td></tr>").join(""):"<tr><td colspan='6'>No policies found.</td></tr>"}catch(e){rows.innerHTML="<tr><td colspan='6'>"+esc(e.message)+"</td></tr>"}}
+window.edit=i=>{let p=policies[i];[...pf.elements].forEach(x=>{if(x.name)x.value=p[x.name]??""});scrollTo({top:0,behavior:"smooth"})};
+window.del=async id=>{if(!confirm("Delete policy "+id+"?"))return;try{await api("/api/policy?id="+encodeURIComponent(id),{method:"DELETE"});msg(sm,"Policy deleted.",true);load(search.value.trim())}catch(e){msg(sm,e.message,false)}};
+function qr(id){let u=new URL("policy.html",location.href);u.searchParams.set("id",id);qrbox.style.display="block";qr.innerHTML="";new QRCode(qr,{text:u.toString(),width:220,height:220});qurl.textContent=u.toString();open.href=u.toString();qrbox.scrollIntoView({behavior:"smooth"})}
+pf.onsubmit=async e=>{e.preventDefault();let o=Object.fromEntries(new FormData(pf).entries());try{let d=await api("/api/policy",{method:"POST",body:JSON.stringify(o)});msg(sm,d.message+" ("+d.policy_no+")",true);qr(d.policy_no);load(search.value.trim())}catch(e){msg(sm,"Save failed: "+e.message,false)}};
+clear.onclick=()=>{pf.reset();pf.policy_type.value="CattleInsurance";pf.policy_status.value="Active";qrbox.style.display="none";sm.className="msg"};
+go.onclick=()=>load(search.value.trim());all.onclick=()=>{search.value="";load()};logout.onclick=()=>{token="";app.classList.add("hidden");login.classList.remove("hidden");pw.focus()};
+printqr.onclick=()=>{let w=open("","_blank");w.document.write("<html><body style='text-align:center;font-family:Arial'><h2>Cattle Insurance Policy Verification</h2>"+qr.innerHTML+"<p>"+esc(qurl.textContent)+"</p><script>onload=()=>print()<\/script></body></html>");w.document.close()};
+</script></body></html>

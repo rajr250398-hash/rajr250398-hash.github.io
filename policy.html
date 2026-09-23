@@ -1,33 +1,18 @@
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cattle Insurance Policy</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Policy Verification</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f4f4ef;font-family:Arial,Helvetica,sans-serif;color:#454545}
-.card{max-width:760px;margin:18px auto;background:#fff;border:1px solid #ddd;box-shadow:0 1px 5px #bbb}
-.top{height:42px;background:#fdbd08}.section{background:#ffff9a;text-align:center;font-size:28px;font-weight:700;padding:22px 10px;border-top:1px solid #ddd;border-bottom:1px solid #ddd}
-.section.green{background:#79c843}.row{display:grid;grid-template-columns:36% 64%;min-height:70px;border-bottom:1px solid #ddd}
-.label,.value{padding:18px 16px;font-size:22px;font-weight:600;display:flex;align-items:center}.label{background:#faf9e5;border-right:1px solid #ddd}
-.value{background:#fff;word-break:break-word}.status{color:green;font-weight:700}
-.message{max-width:760px;margin:40px auto;padding:30px;text-align:center;background:#fff;border:1px solid #ddd;font-size:20px}
-@media(max-width:600px){.section{font-size:22px}.row{grid-template-columns:38% 62%;min-height:60px}.label,.value{font-size:16px;padding:14px 10px}}
-</style></head><body><div id="app"></div>
+body{font-family:Arial;margin:0;background:#f4f7fb;color:#222}.wrap{max-width:900px;margin:25px auto;padding:15px}.card{background:white;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px #0001}.head{background:#166534;color:white;padding:25px}.body{padding:22px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 8px;border-bottom:1px solid #eee}th{width:38%;color:#667085}.actions{margin-top:20px}button,a{padding:10px 15px;border:1px solid #ccd;border-radius:8px;background:white;text-decoration:none;color:#344054}.err{text-align:center;color:#b42318;padding:35px}
+</style></head><body><div class="wrap"><div class="card"><div class="head"><h1>Cattle Insurance Policy Verification</h1><p>Verified policy information</p><b id="status"></b></div><div id="c" class="body">Loading...</div></div></div>
 <script>
-(async function(){
- const id=new URLSearchParams(location.search).get("id"), app=document.getElementById("app");
- if(!id){app.innerHTML='<div class="message"><h2>Policy not specified</h2><p>Open this page using a policy QR code.</p></div>';return;}
- try{
-  const p=(await (await fetch("policies.json",{cache:"no-store"})).json())[id];
-  if(!p){app.innerHTML='<div class="message"><h2>Policy not found</h2><p>Please check the QR code or policy number.</p></div>';return;}
-  const row=(a,b,c="")=>'<div class="row"><div class="label">'+a+'</div><div class="value '+c+'">'+(b||"")+'</div></div>';
-  app.innerHTML='<div class="card"><div class="top"></div>'+
-   row("Policy Issuing Office",p.policyIssuingOffice)+'<div class="section">Policy Details</div>'+
-   row("Policy Type",p.policyType)+row("Policy No.",p.policyNo)+row("Policy Start Date",p.policyStartDate)+
-   row("Policy Expiry Date",p.policyExpiryDate)+row("Sum Insured",p.sumInsured)+row("Net Premium",p.netPremium)+
-   row("GST Amount",p.gstAmount)+row("Total Premium",p.totalPremium)+row("Mode Of Payment",p.modeOfPayment)+
-   row("Policy Status",p.policyStatus,"status")+'<div class="section green">Customer Details</div>'+
-   row("Customer Name",p.customerName)+row("Customer Id",p.customerId)+row("Mobile No",p.mobileNo)+
-   row("E mail Id",p.email)+row("GST Reg. No",p.gstRegNo)+'</div>';
- }catch(e){app.innerHTML='<div class="message"><h2>Unable to load policy</h2><p>Please try again later.</p></div>';}
-})();
+const API="https://cattle-policy-api.rajr250398.workers.dev";
+const fields=[["Policy Issuing Office","policy_issuing_office"],["Policy Type","policy_type"],["Policy No.","policy_no"],["Policy Start Date","policy_start_date"],["Policy Expiry Date","policy_expiry_date"],["Sum Insured","sum_insured"],["Net Premium","net_premium"],["GST Amount","gst_amount"],["Total Premium","total_premium"],["Mode Of Payment","mode_of_payment"],["Policy Status","policy_status"],["Customer Name","customer_name"],["Customer Id","customer_id"],["Mobile No","mobile_no"],["E mail Id","email"],["GST Reg. No.","gst_reg_no"]];
+const esc=x=>String(x??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const val=(k,x)=>x==null||String(x).trim()===""?"-":(["sum_insured","net_premium","gst_amount","total_premium"].includes(k)&&!/rs\.?/i.test(String(x))?"Rs. "+esc(x):esc(x));
+(async()=>{try{
+let id=new URLSearchParams(location.search).get("id")?.trim();if(!id)throw Error("No policy number was provided.");
+let r=await fetch(API+"/api/policy?id="+encodeURIComponent(id)),d=await r.json();if(!r.ok)throw Error(d.error||"Policy not found");
+status.textContent=d.policy_status||"";
+c.innerHTML="<table>"+fields.map(([a,k])=>"<tr><th>"+esc(a)+"</th><td>"+val(k,d[k])+"</td></tr>").join("")+"</table><div class='actions'><button onclick='print()'>Print</button> <a href='index.html'>Verify Another</a></div>";
+document.title="Policy "+(d.policy_no||id);
+}catch(e){c.innerHTML="<div class='err'><b>Policy not found</b><br><br>"+esc(e.message)+"<br><br><a href='index.html'>Back</a></div>"}})();
 </script></body></html>
